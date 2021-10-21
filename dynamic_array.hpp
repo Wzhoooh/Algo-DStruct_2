@@ -11,7 +11,7 @@
 
 
 template < typename T >
-class BidirectionalIterator
+class RandomAccessIterator
 {
 public:
     typedef std::bidirectional_iterator_tag iterator_category;
@@ -26,7 +26,7 @@ template < typename T1, typename Allocator >
     friend class DynArr;
 
 template < typename T1 >
-    friend class BidirectionalIterator;
+    friend class RandomAccessIterator;
 
 private:
     pointer _getPointer() noexcept
@@ -39,24 +39,24 @@ private:
         return _p;
     }
 
-    BidirectionalIterator(pointer p): _p(p)
+    RandomAccessIterator(pointer p): _p(p)
     {}
 
-    operator BidirectionalIterator<std::remove_const<value_type>>() const noexcept
+    operator RandomAccessIterator<std::remove_const<value_type>>() const noexcept
     {
         auto p = (std::remove_const<value_type>*)_p;
-        return BidirectionalIterator<std::remove_const<value_type>>(p);
+        return RandomAccessIterator<std::remove_const<value_type>>(p);
     }
 
 public:
-    BidirectionalIterator(): _p(nullptr)
+    RandomAccessIterator(): _p(nullptr)
     {}
-    BidirectionalIterator(const BidirectionalIterator& other) = default;
+    RandomAccessIterator(const RandomAccessIterator& other) = default;
 
-    ~BidirectionalIterator()
+    ~RandomAccessIterator()
     {}
 
-    BidirectionalIterator& operator=(const BidirectionalIterator& other)
+    RandomAccessIterator& operator=(const RandomAccessIterator& other)
     {
         _p = other._p;
         return *this;
@@ -80,43 +80,76 @@ public:
         return _p;
     }
 
-    BidirectionalIterator& operator++()
+    RandomAccessIterator& operator++()
     {
         _p++;
         return *this;
     }
-    BidirectionalIterator& operator++(int)
+    RandomAccessIterator& operator++(int)
     {
-        BidirectionalIterator<value_type>oldIter(*this);
+        RandomAccessIterator<value_type>oldIter(*this);
         _p++;
         return oldIter;
     }
 
-    BidirectionalIterator& operator--()
+    RandomAccessIterator& operator--()
     {
         _p--;
         return *this;
     }
-    BidirectionalIterator& operator--(int)
+    RandomAccessIterator& operator--(int)
     {
-        BidirectionalIterator<value_type>oldIter(*this);
+        RandomAccessIterator<value_type>oldIter(*this);
         _p--;
         return oldIter;
     }
 
-    bool operator==(const BidirectionalIterator& other) const
+    bool operator==(const RandomAccessIterator& other) const
     {
         return _p == other._p;
     }
-    bool operator!=(const BidirectionalIterator& other) const
+    bool operator!=(const RandomAccessIterator& other) const
     {
         return !(*this == other);
     }
 
-    operator BidirectionalIterator<const value_type>() const noexcept
+    value_type& operator[](size_t n)
+    {
+        return _p[n];
+    }
+    const value_type& operator[](size_t n) const
+    {
+        return _p[n];
+    }
+
+    RandomAccessIterator& operator+=(difference_type n)
+    {
+        _p += n;
+        return *this;
+    }
+    RandomAccessIterator& operator-=(difference_type n)
+    {
+        return *this += -n;
+    }
+    RandomAccessIterator& operator+(difference_type n)
+    {
+        RandomAccessIterator it = *this;
+        return it += n;
+    }
+    RandomAccessIterator& operator-(difference_type n)
+    {
+        return *this + (-n);
+    }
+
+    difference_type operator-(const RandomAccessIterator& other) const
+    {
+        return _p - other._p;
+    }
+
+    operator RandomAccessIterator<const value_type>() const noexcept
     {
         auto p = (const value_type*)_p;
-        return BidirectionalIterator<const value_type>(p);
+        return RandomAccessIterator<const value_type>(p);
     }
 
 private:
@@ -137,8 +170,8 @@ public:
     typedef const value_type& const_reference;
     typedef typename std::allocator_traits<Allocator>::pointer pointer;
     typedef typename std::allocator_traits<Allocator>::const_pointer const_pointer;
-    typedef BidirectionalIterator<value_type> iterator;
-    typedef BidirectionalIterator<const value_type> const_iterator;
+    typedef RandomAccessIterator<value_type> iterator;
+    typedef RandomAccessIterator<const value_type> const_iterator;
 
 private:
     template < typename Alloc >

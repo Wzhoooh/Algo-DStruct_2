@@ -52,6 +52,9 @@ DynArr<int> generateArr(Arg arg, Args... args)
     return newArr;
 }
 
+
+const static size_t gallopCoef = 7;
+
 // inline long long getMinrun(size_t n)
 // {
 //     int r = 0; // станет 1 если среди сдвинутых битов будет хотя бы 1 ненулевой
@@ -69,20 +72,6 @@ inline long long getMinrun(size_t n)
         n >>= 1;
     }
     return n + r;
-}
-
-
-template < typename BidirectionalIterator >
-void advance(BidirectionalIterator p, int dist)
-{
-    if (dist < 0)
-        for (; dist != 0; dist++)
-            p--;
-    else if (dist > 0)
-        for (; dist != 0; dist--)
-            p++;
-
-    std::cout << "pointer: " << p << "\n";
 }
 
 // https://ru.wikipedia.org/wiki/Сортировка_вставками
@@ -131,8 +120,11 @@ template < typename BidirectionalIterator >
 void mergeAll(Stack<Pair<BidirectionalIterator, size_t>>, const BidirectionalIterator begin, 
     const BidirectionalIterator end);
 template < typename BidirectionalIterator >
-Pair<BidirectionalIterator, size_t> merge(Pair<BidirectionalIterator, size_t> fir, 
-    Pair<BidirectionalIterator, size_t> secEnd);
+Pair<BidirectionalIterator, size_t> mergeWithoutGallop(Pair<BidirectionalIterator, size_t> left, 
+    Pair<BidirectionalIterator, size_t> right);
+template < typename RandomAccessIterator >
+Pair<RandomAccessIterator, size_t> merge(Pair<RandomAccessIterator, size_t> left, 
+    Pair<RandomAccessIterator, size_t> right);
 
 template < typename BidirectionalIterator >
 void timSort(const BidirectionalIterator begin, const BidirectionalIterator end)
@@ -147,7 +139,6 @@ Stack<Pair<BidirectionalIterator, size_t>> splitAndSort(const BidirectionalItera
     Stack<Pair<BidirectionalIterator, size_t>> subs;
     auto minRun = getMinrun(std::distance(begin, end));
     auto size = std::distance(begin, end);
-std::cout << "minrun: " << minRun << "\n";
 
     // Проверяем на размер 0 или 1
     if (size == 0 || size == 1)
@@ -212,12 +203,10 @@ std::cout << "minrun: " << minRun << "\n";
             // Длина подмассива меньше minrun
             auto maxSubSize = size - std::distance(begin, subBeginP);
             auto dist = std::min(maxSubSize, minRun);
-std::cout << "dist: " << dist << "\n";
             subEndP = subBeginP;
             std::advance(subEndP, dist);
             subSize = dist;
         }
-std::cout << "subEndP: " << std::distance(begin, subEndP) << "\n";
 
         /*
             К данному подмассиву применяется сортировка вставками. Так как размер 
@@ -239,16 +228,11 @@ std::cout << "subEndP: " << std::distance(begin, subEndP) << "\n";
         subs.push( {subBeginP, (size_t)subSize});
         subBeginP = subEndP;
     }
-std::cout << "[ ";
-for (auto i = begin; i != end; i++)
-    std::cout << *i << " ";
-std::cout << "]\n";
-
     return subs;
 }
 
 template < typename BidirectionalIterator >
-Pair<BidirectionalIterator, size_t> merge(Pair<BidirectionalIterator, size_t> left, 
+Pair<BidirectionalIterator, size_t> mergeWithoutGallop(Pair<BidirectionalIterator, size_t> left, 
     Pair<BidirectionalIterator, size_t> right)
 {
     auto _val = *left.first; // I do not know how to do this other way
@@ -260,8 +244,8 @@ Pair<BidirectionalIterator, size_t> merge(Pair<BidirectionalIterator, size_t> le
     auto tempIt = temp.begin();
     auto rightIt = right.first;
     auto resultIt = left.first;
-    size_t tempIndex = 0, biggerIndex = 0;
-    for (; !(tempIndex == temp.size() && biggerIndex == right.second);)
+    size_t tempIndex = 0, rightIndex = 0;
+    for (; !(tempIndex == temp.size() && rightIndex == right.second);)
     {
         if (tempIndex == temp.size())
         {
@@ -269,9 +253,9 @@ Pair<BidirectionalIterator, size_t> merge(Pair<BidirectionalIterator, size_t> le
             *resultIt = *rightIt;
             resultIt++;
             rightIt++;
-            biggerIndex++;
+            rightIndex++;
         }
-        else if (biggerIndex == right.second)
+        else if (rightIndex == right.second)
         {
             // reached end of right array
             *resultIt = *tempIt;
@@ -292,12 +276,112 @@ Pair<BidirectionalIterator, size_t> merge(Pair<BidirectionalIterator, size_t> le
             else
             {
                 rightIt++;
-                biggerIndex++;
+                rightIndex++;
             }
         }
-// for (auto i = smaller.first; i != resultIt; i++)
-//     std::cout << *i << " ";
-// std::cout << "\n";
+    }
+    return {left.first, left.second + right.second};
+}
+
+template < typename RandomAccessIterator >
+Pair<RandomAccessIterator, size_t> merge(Pair<RandomAccessIterator, size_t> left, 
+    Pair<RandomAccessIterator, size_t> right)
+{
+    auto _val = *left.first; // I do not know how to do this other way
+    DynArr<decltype(_val)> temp(left.second);
+    // move values from left subarray to temp array
+    for (auto i = left.first, j = temp.begin(); j != temp.end(); i++, j++)
+        *j = std::move(*i);
+
+    auto tempIt = temp.begin();
+    auto rightIt = right.first;
+    auto resultIt = left.first;
+    size_t numElemsFromThisSub = 0;
+    int fromSub = 0; // 0 - initial state, 1 - temp, 2 - right
+    for (; !(tempIt == temp.end() && rightIt - right.first == right.second);)
+    {
+        if (tempIt == temp.end())
+            // reached end of temp array
+            break;
+
+        else if (rightIt - right.first == right.second)
+        {
+            // reached end of right array
+            for (; tempIt != temp.end(); resultIt++, tempIt++)
+                *resultIt = *tempIt;
+
+            break;
+        }
+        else
+        {
+            // has not reached end of any array
+            if (numElemsFromThisSub == gallopCoef)
+            {
+                // start galloping mode
+                if (fromSub == 1)
+                {
+                    auto newIt = tempIt;
+                    for(;;)
+                    {
+                        std::ptrdiff_t diff = temp.end() - newIt;
+                        auto it = newIt + diff / 2;
+                        if (it != newIt && *it < *rightIt)
+                            newIt = it;
+                        else
+                            break;
+                    }
+                    for (; newIt - tempIt >= 0; resultIt++, tempIt++)
+                        *resultIt = *tempIt;
+                }
+                else if (fromSub == 2)
+                {
+                    auto newIt = rightIt;
+                    for(;;)
+                    {
+                        std::ptrdiff_t diff = right.first + right.second - newIt;
+                        auto it = newIt + diff / 2;
+                        if (it != newIt && *it < *tempIt)
+                            newIt = it;
+                        else
+                            break;
+                    }
+                    for (; newIt - rightIt >= 0; resultIt++, rightIt++)
+                        *resultIt = *rightIt;
+                }
+                else
+                    throw std::logic_error("error in galloping mode");
+
+                fromSub = 0;
+                numElemsFromThisSub = 0;
+            }
+            else
+            {
+                *resultIt = std::min(*tempIt, *rightIt);
+                resultIt++;
+                if (*tempIt <= *rightIt)
+                {
+                    tempIt++;
+                    if (fromSub == 1)
+                        numElemsFromThisSub++;
+                    else
+                    {
+                        fromSub = 1;
+                        numElemsFromThisSub = 1;
+                    }
+                }
+                else
+                {
+                    rightIt++;
+                    if (fromSub == 2)
+                        numElemsFromThisSub++;
+                    else
+                    {
+                        fromSub = 2;
+                        numElemsFromThisSub = 1;
+                    }
+                }
+            }
+        }
     }
     return {left.first, left.second + right.second};
 }
@@ -319,28 +403,20 @@ void mergeAll(Stack<Pair<BidirectionalIterator, size_t>> subs, BidirectionalIter
         // Добавляем новый элемент в стек
         stack.push(subs.top()); // third
         subs.pop();
-std::cout << "0---\n";
-std::cout << "stack.size(): " << stack.size()  << " " << "\n";
         for (;;)
         {
             auto third = stack.top();
             stack.pop();
             auto second = stack.top();
             stack.pop();
-std::cout << "third: " << std::distance(begin, third.first) << " " << third.second << "\n";
-std::cout << "second: " << std::distance(begin, second.first) << " " << second.second << "\n";            
-std::cout << "1---\n";
             // stack size >= 2 && y <= x -> merge(x, y)
             if (second.second <= third.second)
             {
-std::cout << "merging(x, y)\n";
                 stack.push(merge(third, second));
             }
             // stack size >= 3 && z <= x + y -> merge(y, min(x, z))
             else if (!stack.empty() && stack.top().second <= third.second + second.second)
             {
-std::cout << "merging(x, y, z)\n";                
-std::cout << "stack.top(): " << std::distance(begin, stack.top().first) << " " << stack.top().second << "\n";
                 if (third.second <= stack.top().second)
                     stack.push(merge(third, second));
                 else
@@ -357,14 +433,11 @@ std::cout << "stack.top(): " << std::distance(begin, stack.top().first) << " " <
                 stack.push(third);
                 break;
             }
-std::cout << "2---\n";
             if (stack.size() == 1)
                 break;
 
-std::cout << "3---\n";
         }
     }
-std::cout << "range finish---\n";    
     // Производим слияние всех оставшихся элементов в стеке
     for (; stack.size() != 1;)
     {
@@ -374,24 +447,14 @@ std::cout << "range finish---\n";
         stack.pop();
         stack.push(merge(x, y));
     }
-std::cout << "last el: " << std::distance(begin, stack.top().first) << " " << stack.top().second << "\n";
 }
 
 int main()
 {
-    DynArr<int> arr = generateArr(Pair(53, -30), Pair(30, 55));
-    std::cout << "[ ";
-    for (auto&& i : arr)
-        std::cout << i << " ";
-    std::cout << "]\n";
-
-    std::cout << "arr size: " << arr.size() << "\n";
+    DynArr<int> arr1 = generateArr(Pair(99, 40), Pair(10, 20));
+    DynArr<int> arr = generateArr(Pair(99, 10), Pair(20, 70), Pair(60, 15));
+    std::cout << "Input: " << arr << "\n\n";
     timSort(arr.begin(), arr.end());
-
-    std::cout << "[ ";
-    for (auto&& i : arr)
-        std::cout << i << " ";
-    std::cout << "]\n";
-
-    std::cout << "finish";
+    std::cout << "Result: " << arr << "\n\n";
+    std::cout << "finished";
 }
